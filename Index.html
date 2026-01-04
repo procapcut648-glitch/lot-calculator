@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Risk / Lot Size Calculator</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --card:#121a33;
+      --muted:#9aa6c0;
+      --text:#e8eeff;
+      --accent:#6ee7ff;
+      --good:#4ade80;
+      --warn:#fbbf24;
+      --bad:#fb7185;
+      --border:rgba(255,255,255,.10);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(110,231,255,.12), transparent 55%),
+                  radial-gradient(900px 600px at 90% 20%, rgba(74,222,128,.10), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+      padding:16px;
+    }
+    .wrap{max-width:520px;margin:0 auto}
+    .title{
+      font-size:18px;
+      font-weight:700;
+      letter-spacing:.2px;
+      margin:6px 0 10px;
+    }
+    .sub{
+      color:var(--muted);
+      font-size:12px;
+      margin-bottom:14px;
+      line-height:1.4;
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:14px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    }
+    .row{display:flex;gap:10px}
+    .row > *{flex:1}
+    label{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      margin:10px 0 6px;
+    }
+    input, select{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,.25);
+      color:var(--text);
+      outline:none;
+      font-size:15px;
+    }
+    input::placeholder{color:rgba(154,166,192,.7)}
+    .pillbar{
+      display:flex;
+      gap:8px;
+      margin-top:10px;
+    }
+    .pill{
+      flex:1;
+      padding:10px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,.22);
+      color:var(--muted);
+      font-size:13px;
+      font-weight:600;
+      text-align:center;
+      cursor:pointer;
+      user-select:none;
+    }
+    .pill.active{
+      background: rgba(110,231,255,.14);
+      color:var(--text);
+      border-color: rgba(110,231,255,.35);
+    }
+    .result{
+      margin-top:14px;
+      padding:14px;
+      border-radius:16px;
+      border:1px dashed rgba(110,231,255,.35);
+      background: rgba(110,231,255,.06);
+    }
+    .big{
+      font-size:22px;
+      font-weight:800;
+      letter-spacing:.2px;
+      margin:4px 0 2px;
+    }
+    .meta{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.5;
+    }
+    .actions{
+      display:flex;
+      gap:10px;
+      margin-top:12px;
+    }
+    button{
+      flex:1;
+      border:none;
+      border-radius:14px;
+      padding:12px 12px;
+      font-size:14px;
+      font-weight:700;
+      cursor:pointer;
+      color:#071018;
+      background: linear-gradient(90deg, var(--accent), #a7f3ff);
+    }
+    button.secondary{
+      color:var(--text);
+      background: rgba(255,255,255,.08);
+      border:1px solid var(--border);
+    }
+    .hint{
+      margin-top:10px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .hidden{display:none}
+    .badge{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:700;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,.25);
+      color:var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">Risk / Lot Size Calculator</div>
+    <div class="sub">
+      Simple manual calculator (no auto-pip). Set your fixed risk (default <b>$125</b>),
+      enter your stop loss, and get lot size / quantity instantly.
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Risk per trade ($)</label>
+          <input id="risk" type="number" inputmode="decimal" value="125" min="0" step="0.01" />
+        </div>
+        <div>
+          <label>Precision (decimals)</label>
+          <select id="precision">
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="pillbar" role="tablist" aria-label="Mode">
+        <div class="pill active" data-mode="forex" role="tab">Forex</div>
+        <div class="pill" data-mode="gold" role="tab">Gold (XAU)</div>
+        <div class="pill" data-mode="crypto" role="tab">Crypto</div>
+      </div>
+
+      <!-- FOREX -->
+      <div id="panel-forex">
+        <label>Stop Loss (pips)</label>
+        <input id="fx_sl" type="number" inputmode="decimal" placeholder="e.g. 25" min="0" step="0.01" />
+
+        <label>Pip value per 1.00 lot ($/pip)</label>
+        <input id="fx_pipval" type="number" inputmode="decimal" value="10" min="0" step="0.01" />
+
+        <div class="hint">
+          Tip: For many USD-quoted majors, 1.00 lot ≈ <b>$10/pip</b> (confirm with your broker).
+        </div>
+      </div>
+
+      <!-- GOLD -->
+      <div id="panel-gold" class="hidden">
+        <label>Stop Loss (points)</label>
+        <input id="xau_sl" type="number" inputmode="decimal" placeholder="e.g. 250" min="0" step="0.01" />
+
+        <label>Point value per 1.00 lot ($/point)</label>
+        <input id="xau_pointval" type="number" inputmode="decimal" value="1" min="0" step="0.01" />
+
+        <div class="hint">
+          If your broker uses a different contract size, change point value to match.
+        </div>
+      </div>
+
+      <!-- CRYPTO -->
+      <div id="panel-crypto" class="hidden">
+        <label>Stop Loss difference ($)</label>
+        <input id="c_slusd" type="number" inputmode="decimal" placeholder="e.g. 500" min="0" step="0.01" />
+
+        <label>Coin / Token name (optional)</label>
+        <input id="c_symbol" type="text" placeholder="e.g. BTC, ETH, SOL" />
+
+        <div class="hint">
+          Quantity = Risk ÷ StopLoss($). Works for spot or perpetuals (where quantity is in coins).
+        </div>
+      </div>
+
+      <div class="result" aria-live="polite">
+        <div class="badge" id="modeBadge">Mode: Forex</div>
+        <div class="big" id="outMain">—</div>
+        <div class="meta" id="outMeta">Enter values to calculate.</div>
+      </div>
+
+      <div class="actions">
+        <button id="calcBtn">Calculate</button>
+        <button class="secondary" id="resetBtn">Reset</button>
+      </div>
+
+      <div class="hint">
+        Formula:
+        <span id="formulaText">Lot = Risk ÷ (SL pips × PipValue)</span>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const pills = Array.from(document.querySelectorAll(".pill"));
+  const panels = {
+    forex: $("panel-forex"),
+    gold: $("panel-gold"),
+    crypto: $("panel-crypto")
+  };
+
+  let mode = "forex";
+
+  function setMode(next){
+    mode = next;
+    pills.forEach(p => p.classList.toggle("active", p.dataset.mode === next));
+    Object.keys(panels).forEach(k => panels[k].classList.toggle("hidden", k !== next));
+
+    $("modeBadge").textContent = "Mode: " + (next === "forex" ? "Forex" : next === "gold" ? "Gold (XAU)" : "Crypto");
+    $("formulaText").textContent =
+      next === "forex" ? "Lot = Risk ÷ (SL pips × PipValue per 1 lot)" :
+      next === "gold"  ? "Lot = Risk ÷ (SL points × PointValue per 1 lot)" :
+                        "Qty = Risk ÷ SL($ difference)";
+
+    calculate(); // live update
+  }
+
+  pills.forEach(p => p.addEventListener("click", () => setMode(p.dataset.mode)));
+
+  function num(v){
+    const x = parseFloat(v);
+    return Number.isFinite(x) ? x : 0;
+  }
+
+  function fmt(x, decimals){
+    return Number.isFinite(x) ? x.toFixed(decimals) : "—";
+  }
+
+  function calculate(){
+    const risk = num($("risk").value);
+    const decimals = parseInt($("precision").value, 10);
+
+    let main = "—";
+    let meta = "Enter values to calculate.";
+
+    if (risk <= 0){
+      $("outMain").textContent = "—";
+      $("outMeta").textContent = "Risk must be greater than 0.";
+      return;
+    }
+
+    if (mode === "forex"){
+      const sl = num($("fx_sl").value);
+      const pipVal = num($("fx_pipval").value);
+      const denom = sl * pipVal;
+
+      if (sl > 0 && pipVal > 0 && denom > 0){
+        const lot = risk / denom;
+        main = fmt(lot, decimals) + " lot";
+        meta = `Risk $${fmt(risk, 2)} | SL ${fmt(sl, 2)} pips | PipValue $${fmt(pipVal, 2)}/pip (per 1 lot)`;
+      } else {
+        meta = "Enter Stop Loss (pips) and Pip Value (per 1 lot).";
+      }
+    }
+
+    if (mode === "gold"){
+      const sl = num($("xau_sl").value);
+      const pv = num($("xau_pointval").value);
+      const denom = sl * pv;
+
+      if (sl > 0 && pv > 0 && denom > 0){
+        const lot = risk / denom;
+        main = fmt(lot, decimals) + " lot";
+        meta = `Risk $${fmt(risk, 2)} | SL ${fmt(sl, 2)} points | PointValue $${fmt(pv, 2)}/point (per 1 lot)`;
+      } else {
+        meta = "Enter Stop Loss (points) and Point Value (per 1 lot).";
+      }
+    }
+
+    if (mode === "crypto"){
+      const slUsd = num($("c_slusd").value);
+      const sym = ($("c_symbol").value || "").trim();
+      if (slUsd > 0){
+        const qty = risk / slUsd;
+        main = fmt(qty, decimals) + (sym ? ` ${sym}` : " units");
+        meta = `Risk $${fmt(risk, 2)} | SL difference $${fmt(slUsd, 2)} | Quantity = Risk ÷ SL($)`;
+      } else {
+        meta = "Enter Stop Loss difference ($).";
+      }
+    }
+
+    $("outMain").textContent = main;
+    $("outMeta").textContent = meta;
+  }
+
+  function resetAll(){
+    $("risk").value = "125";
+    $("precision").value = "2";
+    $("fx_sl").value = "";
+    $("fx_pipval").value = "10";
+    $("xau_sl").value = "";
+    $("xau_pointval").value = "1";
+    $("c_slusd").value = "";
+    $("c_symbol").value = "";
+    setMode("forex");
+  }
+
+  // Buttons
+  $("calcBtn").addEventListener("click", calculate);
+  $("resetBtn").addEventListener("click", resetAll);
+
+  // Live update on input
+  ["risk","precision","fx_sl","fx_pipval","xau_sl","xau_pointval","c_slusd","c_symbol"].forEach(id=>{
+    $(id).addEventListener("input", calculate);
+  });
+
+  // Init
+  setMode("forex");
+</script>
+</body>
+</html>
